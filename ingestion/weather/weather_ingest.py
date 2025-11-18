@@ -1,8 +1,14 @@
 import json
 import time
+import os
 import requests
 from kafka import KafkaProducer
 from datetime import datetime
+from logging_utils import json_log
+
+KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
+SLEEP_SECONDS = int(os.getenv("WEATHER_SLEEP_SECONDS", "300"))  # default 5 min
+COMPONENT = "weather_ingest"
 
 BOSTON_COORDS = {
     "lat": 42.3601,
@@ -21,6 +27,7 @@ def fetch_weather():
         lon=BOSTON_COORDS["lon"]
     )
     try:
+        json_log(COMPONENT, "api_request", url=url)
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
@@ -36,32 +43,46 @@ def fetch_weather():
             "weather_code": hourly["weathercode"][0],
             "wind_speed": hourly["windspeed_10m"][0]
         }
-
+        json_log(COMPONENT, "api_success", temperature=record["temperature"], humidity=record["humidity"])
         return record
 
     except Exception as e:
-        print("Error fetching weather:", e)
+        json_log(COMPONENT, "api_error", error=str(e))
         return None
 
 
 def get_producer():
     return KafkaProducer(
-        bootstrap_servers=["kafka:9092"],
-        value_serializer=lambda v: json.dumps(v).encode("utf-8")
+        bootstrap_servers=KAFKA_BROKER,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        retries=5,
     )
 
 
 def main():
+    json_log(COMPONENT, "start", broker=KAFKA_BROKER)
     producer = get_producer()
+    json_log(COMPONENT, "producer_ready")
 
+    cycle = 0
     while True:
+        cycle_start = time.time()
+        cycle += 1
+        json_log(COMPONENT, "cycle_begin", cycle=cycle)
         record = fetch_weather()
+        sent = 0
         if record:
             producer.send("weather_raw", record)
             producer.flush()
-            print("Sent weather update:", record)
+            json_log(COMPONENT, "send_success", cycle=cycle)
+            sent = 1
+        else:
+            json_log(COMPONENT, "send_skipped", cycle=cycle)
 
-        time.sleep(300)  # 5 minutes
+        elapsed = round(time.time() - cycle_start, 3)
+        throughput = round((sent / elapsed) if elapsed > 0 else 0.0, 3)
+        json_log(COMPONENT, "cycle_complete", cycle=cycle, elapsed_sec=elapsed, records_sent=sent, throughput_rps=throughput, sleep_sec=SLEEP_SECONDS)
+        time.sleep(SLEEP_SECONDS)
 
 
 if __name__ == "__main__":

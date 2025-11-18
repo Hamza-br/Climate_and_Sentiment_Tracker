@@ -15,7 +15,7 @@
       },
       "targets": [
         {
-          "query": "{component=~\"weather_ingest|air_ingest|youtube_ingest|spark_processor\"}",
+          "query": "{} | json | component=~\"weather_ingest|air_ingest|youtube_ingest|spark_processor\"",
           "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
         }
       ]
@@ -27,7 +27,7 @@
       "fieldConfig": {"defaults": {"unit": "ops"}},
       "targets": [
         {
-          "expr": "sum by (component) (rate({event=\"send_success\"}[1m]))",
+          "expr": "sum by (component) (rate(({} | json | label_format component=\"{{component}}\" | event=\"send_success\")[5m]))",
           "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
         }
       ]
@@ -39,7 +39,7 @@
       "fieldConfig": {"defaults": {"unit": "ops"}},
       "targets": [
         {
-          "expr": "sum by (stream) (avg_over_time({component=\"spark_processor\",event=\"send_success\"} | json | unwrap throughput_rps [1m]))",
+          "expr": "sum by (stream) (avg_over_time(({} | json | component=\"spark_processor\" | event=\"send_success\" | label_format stream=\"{{stream}}\" | unwrap throughput_rps)[5m]))",
           "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
         }
       ]
@@ -51,7 +51,7 @@
       "fieldConfig": {"defaults": {"unit": "s"}},
       "targets": [
         {
-          "expr": "avg by (component) (avg_over_time({event=\"cycle_complete\"} | json | unwrap elapsed_sec [5m]))",
+          "expr": "avg by (component) (avg_over_time(({} | json | label_format component=\"{{component}}\" | event=\"cycle_complete\" | unwrap elapsed_sec)[5m]))",
           "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
         }
       ]
@@ -62,7 +62,7 @@
       "gridPos": {"x": 8, "y": 18, "w": 8, "h": 6},
       "targets": [
         {
-          "expr": "last_over_time({event=\"cycle_complete\"} | json | unwrap records_sent [5m])",
+          "expr": "last_over_time(({} | json | event=\"cycle_complete\" | unwrap records_sent)[5m])",
           "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
         }
       ]
@@ -74,7 +74,7 @@
       "fieldConfig": {"defaults": {"unit": "ops"}},
       "targets": [
         {
-          "expr": "last_over_time({event=\"cycle_complete\"} | json | unwrap throughput_rps [5m])",
+          "expr": "last_over_time(({} | json | event=\"cycle_complete\" | unwrap throughput_rps)[5m])",
           "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
         }
       ]
