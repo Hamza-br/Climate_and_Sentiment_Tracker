@@ -1,0 +1,96 @@
+{
+  "title": "Pipeline Observability",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "logs",
+      "title": "Recent Pipeline Logs",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 10},
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showLabels": true,
+        "showTime": true,
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "query": "{component=~\"weather_ingest|air_ingest|youtube_ingest|spark_processor\"}",
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Send Success Rate by Component (events/s)",
+      "gridPos": {"x": 0, "y": 10, "w": 12, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "targets": [
+        {
+          "expr": "sum by (component) (rate({event=\"send_success\"}[1m]))",
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Spark Throughput by Stream (rows/s)",
+      "gridPos": {"x": 12, "y": 10, "w": 12, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "targets": [
+        {
+          "expr": "sum by (stream) (avg_over_time({component=\"spark_processor\",event=\"send_success\"} | json | unwrap throughput_rps [1m]))",
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Cycle Duration (avg, sec)",
+      "gridPos": {"x": 0, "y": 18, "w": 8, "h": 6},
+      "fieldConfig": {"defaults": {"unit": "s"}},
+      "targets": [
+        {
+          "expr": "avg by (component) (avg_over_time({event=\"cycle_complete\"} | json | unwrap elapsed_sec [5m]))",
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Records Sent (last cycle)",
+      "gridPos": {"x": 8, "y": 18, "w": 8, "h": 6},
+      "targets": [
+        {
+          "expr": "last_over_time({event=\"cycle_complete\"} | json | unwrap records_sent [5m])",
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Throughput (last cycle, rps)",
+      "gridPos": {"x": 16, "y": 18, "w": 8, "h": 6},
+      "fieldConfig": {"defaults": {"unit": "ops"}},
+      "targets": [
+        {
+          "expr": "last_over_time({event=\"cycle_complete\"} | json | unwrap throughput_rps [5m])",
+          "datasource": {"type": "loki", "uid": "${DS_LOKI}"}
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_LOKI",
+        "type": "datasource",
+        "query": "loki",
+        "label": "Loki datasource",
+        "current": {"text": "Loki", "value": "Loki"}
+      }
+    ]
+  },
+  "schemaVersion": 36,
+  "version": 1
+}
