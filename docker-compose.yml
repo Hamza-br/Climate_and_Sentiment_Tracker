@@ -58,7 +58,7 @@ services:
         condition: service_healthy
     restart: always
     environment:
-      - OPENAQ_API_KEY=74e948f72fd4d96b94a2b8a2acded929e813645d769d409bcf04db71c5898f7c
+      - OPENAQ_API_KEY=
       - KAFKA_BROKER=kafka:29092
       - AIR_SLEEP_SECONDS=30
 
@@ -71,7 +71,7 @@ services:
         condition: service_healthy
     restart: always
     environment:
-      - YOUTUBE_API_KEY=AIzaSyCAXxUrDs3tioIjmSFwKqw3XUbYimhNRJA
+      - YOUTUBE_API_KEY=
       - KAFKA_BROKER=kafka:29092
       - YOUTUBE_SLEEP_SECONDS=30
 
