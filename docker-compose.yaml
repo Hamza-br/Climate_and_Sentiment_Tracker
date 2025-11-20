@@ -1,0 +1,71 @@
+services:
+  zookeeper:
+    image: bitnamilegacy/zookeeper:latest
+    container_name: zookeeper
+    environment:
+      - ZOO_ENABLE_AUTH=yes
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: bitnamilegacy/kafka:latest
+    container_name: kafka
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=local
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+
+  air_ingest:
+    build:
+      context: ./ingestion/air_quality
+      dockerfile: Dockerfile
+    container_name: air_ingest
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP: "kafka:9092"
+    restart: unless-stopped
+
+  weather_ingest:
+    build:
+      context: ./ingestion/weather
+      dockerfile: Dockerfile
+    container_name: weather_ingest
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: "kafka:9092"
+      WEATHER_SLEEP_SECONDS: "300"
+    restart: unless-stopped
+
+  youtube_ingest:
+    build:
+      context: ./ingestion/youtube
+      dockerfile: Dockerfile
+    container_name: youtube_ingest
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: "kafka:9092"
+      YOUTUBE_SLEEP_SECONDS: "300"
+    restart: unless-stopped
+
