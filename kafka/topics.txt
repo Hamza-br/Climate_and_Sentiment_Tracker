@@ -2,3 +2,5 @@ youtube_raw
 weather_raw
 air_raw
 sentiment_scored
+
+youtube_raw,weather_raw,air_raw,sentiment_scored

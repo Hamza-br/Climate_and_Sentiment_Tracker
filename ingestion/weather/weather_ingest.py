@@ -5,6 +5,7 @@ import requests
 from kafka import KafkaProducer
 from datetime import datetime
 from logging_utils import json_log
+from kafka.errors import NoBrokersAvailable
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
 SLEEP_SECONDS = int(os.getenv("WEATHER_SLEEP_SECONDS", "300"))  # default 5 min
@@ -50,14 +51,20 @@ def fetch_weather():
         json_log(COMPONENT, "api_error", error=str(e))
         return None
 
-
-def get_producer():
-    return KafkaProducer(
-        bootstrap_servers=KAFKA_BROKER,
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        retries=5,
-    )
-
+def get_producer(max_retries=12, wait_s=5):
+    for attempt in range(1, max_retries + 1):
+        try:
+            p = KafkaProducer(
+                bootstrap_servers=KAFKA_BROKER,
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                retries=5,
+            )
+            print(f"producer ready -> {KAFKA_BROKER}")
+            return p
+        except NoBrokersAvailable:
+            print(f"Kafka not ready (attempt {attempt}/{max_retries}), sleeping {wait_s}s")
+            time.sleep(wait_s)
+    raise RuntimeError("Kafka not available after retries")
 
 def main():
     json_log(COMPONENT, "start", broker=KAFKA_BROKER)
