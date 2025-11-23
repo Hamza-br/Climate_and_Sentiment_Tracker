@@ -1,57 +1,108 @@
-# Climate & Sentiment Tracker – Observability
+# Climate & Sentiment Tracker
 
-This project now emits structured, machine-readable JSON logs across ingestion services and the Spark processor to make monitoring and troubleshooting simple.
+## Status: Under Development & Continuous Improvement
 
-## Log Format
+Production-focused data pipeline integrating climate (weather, air quality) and social sentiment signals for real-time analytics and visualization. This project is actively being developed with regular updates and enhancements.
 
-- Fields: `ts_utc` (ISO8601 UTC), `component`, `event`, plus context fields.
-- Output: one JSON object per line to stdout/stderr (Docker friendly).
+## Overview
 
-### Core Events
+- Ingestion microservices pull weather, air quality, and social content, normalizing and enriching events.
+- Stream processing (Spark) cleans, transforms, and correlates climate + sentiment metrics.
+- Cassandra stores raw and aggregated data for fast retrieval.
+- FastAPI service exposes REST endpoints for dashboards and external consumers.
+- Grafana provides interactive visualization (provisioned automatically).
+- Airflow DAGs (optional) orchestrate batch ML training and Spark workflows.
 
-- `start`: service start with key config (e.g., broker, host).
-- `producer_ready`: producer/sinks initialized and ready.
-- `cycle_begin`: a polling/processing cycle or Spark micro-batch begins.
-- `send_success`: records written to Kafka/Cassandra successfully.
-- `cycle_complete`: cycle finished with metrics.
+## Core Components
 
-### Cycle Metrics
+- ingestion/: Source-specific ingestion services (weather, air quality, social) containerized individually.
+- spark/: Transformation & correlation logic (stream/batch) producing enriched and aggregate datasets.
+- pi/: FastAPI application serving health, latest metrics, anomalies, sentiment summaries, correlations.
+- cassandra/: Keyspace & table initialization scripts.
+- grafana/: Provisioned dashboards and datasource definitions.
+- dags/: Airflow DAGs for ML model retraining and Spark batch jobs.
+- model/: Inference utilities (sentiment or anomaly scoring integration point).
 
-- `elapsed_sec`: duration of the cycle/micro-batch.
-- `records_sent`: number of records produced (ingestion) or rows written (Spark).
-- `throughput_rps`: computed as `records_sent / elapsed_sec`.
+## Data Flow
 
-Example log line:
+1. Ingestion containers fetch external data (APIs, streams) and write normalized events to Kafka / staging.
+2. Spark processors consume, clean, validate schemas, and derive correlation + aggregate metrics.
+3. Cassandra stores both raw granular events and daily aggregates.
+4. API layer queries Cassandra with optimized CQL patterns for dashboard consumption.
+5. Grafana dashboards visualize real-time and historical climate & sentiment dynamics.
 
-```json
-{"ts_utc":"2025-11-18T12:34:56.789012","component":"weather_ingest","event":"cycle_complete","cycle":42,"elapsed_sec":0.123,"records_sent":1,"throughput_rps":8.13,"sleep_sec":300}
-```
+## Getting Started
 
-## Where Logs Come From
-
-- Ingestion services: `ingestion/weather`, `ingestion/air_quality`, `ingestion/youtube` emit events for API requests and Kafka sends.
-- Spark processor: `spark/processor.py` emits events per micro-batch when writing to Cassandra (tables: raw, metrics hourly/daily).
-
-## Viewing Logs
-
-Use Docker to tail service logs in JSON:
+Requirements: Docker + Docker Compose.
 
 ```powershell
-docker compose logs -f weather_ingest
-docker compose logs -f air_ingest
-docker compose logs -f youtube_ingest
-docker compose logs -f spark_job
+docker compose up -d --build
 ```
 
-## Optional: Grafana Dashboard (Loki)
+Services brought up:
 
-- A ready-to-import dashboard is provided at `grafana/dashboards/pipeline_observability.json`.
-- Assumes a Grafana Loki data source named `Loki` (variable `DS_LOKI`).
-- Panels include:
-	- Recent pipeline logs
-	- Send-success rate by component
-	- Spark throughput by stream (rows/s)
-	- Average cycle duration and last-cycle stats
+- Cassandra database
+- Ingestion microservices
+- Spark processing container
+- FastAPI service (default: <http://localhost:8000>)
+- Grafana (default: <http://localhost:3000>)
 
-To use: configure Loki + Promtail (or your preferred log pipeline) to collect container stdout, then import the dashboard JSON in Grafana.
+## API Examples
 
+- Health: GET /health
+- Latest Weather: GET /api/v1/weather/latest?limit=20
+- Weather Anomalies: GET /api/v1/weather/anomalies?limit=50
+- Latest Air Quality: GET /api/v1/air-quality/latest?parameter=pm25
+- Pollution Spikes: GET /api/v1/air-quality/pollution-spikes?limit=50
+- Latest Social Posts: GET /api/v1/social/posts/latest?limit=20
+- Sentiment Summary: GET /api/v1/social/sentiment/summary
+- Daily Aggregates: GET /api/v1/analytics/daily?date=2025-11-23&city=Boston, USA
+
+## Configuration
+
+Environment variables (override in compose or container runtime):
+
+- CASSANDRA_HOST (default: localhost)
+- CASSANDRA_PORT (default: 9042)
+- CASSANDRA_KEYSPACE (default: climate_sentiment)
+- CASSANDRA_USER / CASSANDRA_PASSWORD
+
+## Development
+
+Run API locally (after ensuring Cassandra accessible):
+
+```powershell
+python api/main.py
+```
+
+## Folder Structure (Essential Only)
+
+```text
+api/            FastAPI service
+ingestion/      Source ingestion microservices
+spark/          Stream & batch processing
+cassandra/      Keyspace & schema setup
+grafana/        Dashboards & provisioning
+dags/           Airflow orchestration (optional)
+model/          Inference utilities
+docker-compose.yaml  Multi-service orchestration
+API_DOCUMENTATION.md Endpoint reference (extended)
+verify_system.py     Basic runtime/system checks
+inject_test_data.py  Utility for sample/test inserts
+```
+
+## Production Hardening (Next Steps)
+
+- Add auth layer (e.g. API keys or OAuth) for API.
+- Implement retention policies / TTLs in Cassandra.
+- Integrate structured logging with centralized aggregation.
+- Add unit/integration tests and CI pipeline.
+- Enable schema evolution strategy (migrations tooling).
+
+## License
+
+Specify project license here.
+
+## Contributing
+
+Open issues / PRs following conventional commits and include context + reproducible steps.
